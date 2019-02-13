@@ -117,17 +117,13 @@ IAM policy - CCEIMG_packer_amibuilder_IAM_policy
     ]
 }
 ```
-AWS Policy ARN - arn:aws:iam::378114605806:policy/CCEIMG_packer_amibuilder_IAM_policy</br>
-Policy JSON is available [here](https://git.corp.adobe.com/dunamis-devops/packer-amibulder/blob/master/packer_IAM_role.json)
 
 ##### Step 2 - IAM Role using this policy
 
-Role - CCEIMG_packer_amibuilder_IAM_Role</br>
-AWS Role ARN - arn:aws:iam::378114605806:role/CCEIMG_packer_amibuilder_IAM_Role
 
 ##### Step 3 - Create S3 bucket where we will upload all software packages to be used or installed to customize our AMI
 
-S3 bucket - https://s3.amazonaws.com/packer-ami-build
+S3 bucket - https://s3.amazonaws.com/somefolder
 
 ##### Step 4 - Create Amazon Linux based t2.micro instance and install Hashicorp Packer in it
 
@@ -172,19 +168,12 @@ Available commands are:
 
 To Log in to the instance - first SSH in to the bastion_CD or dev bastion host and then from there use the 'dunamis_cd' ssh key to log in to Packer instance as 'ec2-user':
 ```
--bash-4.2$ ssh -i dunamis_cd.pem ec2-user@10.76.151.146
+-bash-4.2$ ssh -i yourkey.pem ec2-user@10.x.x.x
 Last login: Fri Mar  2 23:39:27 2018 from ip-10-76-151-119.ec2.internal
-              888          888
-              888          888
-              888          888
- 8888b.   .d88888  .d88b.  88888b.   .d88b.
-    '88b d88' 888 d88''88b 888 '88b d8P  Y8b
-.d888888 888  888 888  888 888  888 88888888
-888  888 Y88b 888 Y88..88P 888 d88P Y8b.
-'Y888888  'Y88888  'Y88P'  88888P'   'Y8888
+
 
 Version 20180302
-Dunamis Packer Instance
+Packer Instance
 ===============
 
 No packages needed for security; 15 packages available
@@ -204,7 +193,7 @@ The config file looks like this (which uses the IAM instance role we created ear
 
 ```
 [profile packerrole]
-arn:aws:iam::378114605806:role/CCEIMG_packer_amibuilder_IAM_Role
+arn:aws:iam::xxxxxx:role/xxxxxpacker_amibuilder_IAM_Role
 source_profile = default
 ```
 
@@ -212,7 +201,7 @@ source_profile = default
 ```
 /root
 ├── call_packer.sh
-├── CCEIMG_ami_packer.json
+├── ami_packer.json
 ├── client.rb.tpl
 └── cookbooks
     └── customizami
@@ -271,7 +260,7 @@ echo -e '\033[1m\033[0m'
     "type": "amazon-ebs",
     "profile": "{{user `profile`}}",
     "region": "us-east-1",
-    "subnet_id": "subnet-5c4d6974",
+    "subnet_id": "subnet-xxxxxx",
     "source_ami": "{{user `SOURCEAMI`}}",
     "instance_type": "t2.micro",
     "ssh_username": "ec2-user",
@@ -366,8 +355,8 @@ echo -e '\033[1m\033[0m'
 ```
 
 Points to note in the JSON file:
-1. "remote_folder": "/home/ec2-user" has to be specified for all shell provisioners as /tmp on CloudOPS source AMIs are not write-able by ec2-user which is what packer uses to run commands from.
-2. Volume types and sizes need to be specified - CloudOPS AMIs use separate 1G volume / disk for /tmp folder
+1. "remote_folder": "/home/ec2-user" has to be specified for all shell provisioners as /tmp on custom source AMIs are not write-able by ec2-user which is what packer uses to run commands from.
+2. Volume types and sizes need to be specified - custom AMIs use separate 1G volume / disk for /tmp folder
 
 ###### Chef Recipe:
 
@@ -413,7 +402,7 @@ file '/home/deploy/.ssh/authorized_keys' do
   owner 'deploy'
   group 'deploy'
   mode '0644'
-  content 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCVOE4sISpAzTsw8qZyk/pqGepybB1/GXGzvYmXfGJtFmp9dfgNuOWYshk5zmsqxnRR9mAsi/SVVikdhaOr8YKQKr7kJOH5n0uNsqPgXwlJCs9TP/VO3svbuhPP47fdvohp9kAhEBJtzVkyDi9NH+tQkE+8qrVo4THWRqvDyA7tvexAWiHifZxtMKzUyYnHQeVOsjmo7b9SSi+HDzsGFAWosRjjFTMVOFj/dfcT8Gx8objQiu2x5C+5yYNfRWYDOO47yVVrT3w3CfTjeQF2Fi6qIfuuIDarFt3NrnW2SghtcjvPtDBjLu35cB8CC6urERIKi8s3rqWxjly5amQ6JZnl dunamis_cd
+  content 'ssh-rsa xxxxxxxyourekeyxxxxxx yourusername
 '
   action :create
 end
@@ -425,14 +414,7 @@ file '/etc/update-motd.d/30-banner' do
   mode '0755'
   content '
 #!/bin/bash
-echo "              888          888"
-echo "              888          888"
-echo "              888          888"
-echo " 8888b.   .d88888  .d88b.  88888b.   .d88b."
-echo "    \'88b d88\' 888 d88\'\'88b 888 \'88b d8P  Y8b"
-echo ".d888888 888  888 888  888 888  888 88888888"
-echo "888  888 Y88b 888 Y88..88P 888 d88P Y8b."
-echo "\'Y888888  \'Y88888  \'Y88P\'  88888P\'   \'Y8888"
+####
  
 echo "Version 20180302"'
   action :create
@@ -939,18 +921,13 @@ curl -i "http://localhost:5000/runpacker?sourceami=ami-465fe039"
 ```
 
 ##### Add AWS Security Group and rule to allow access to Packer Instance
-Add Security Group and rule as shown below from Adobe IT OR1 data center 'Egress IP' to allow our Jenkins instance running in IT's Oregon datacenter to access the packer Flask APIs over HTTPS.
-
-![Security Group and rule](https://git.corp.adobe.com/dunamis-devops/packer-amibulder/blob/master/packer-jenkins_sg.png)
+Add Security Group and rule as shown below from ypur data center 'Egress IP' to allow our Jenkins instance running in datacenter to access the packer Flask APIs over HTTPS.
 
 **Don't forget to add the new Security Group to the Packer instance created earlier**
 
 ##### Jenkins "parameterized" job to call the Python Flask API and generate new AMIs on demand
-![Jenkins Job Configuration](https://git.corp.adobe.com/dunamis-devops/packer-amibulder/blob/master/packer_ami_jenkins_job.png)
 
 ##### Run Jenkins job specifying the source AMI ID
-![Jenkins Job run](https://git.corp.adobe.com/dunamis-devops/packer-amibulder/blob/master/jenkins_run_job.png)
-
 
 ###### Files used for AMI build on Dunamis_cd account S3
 
@@ -978,20 +955,20 @@ log_location             STDOUT
 cache_type               'BasicFile'
 cache_options( :path => '/root/.chef/checksums' )
 cookbook_path [ File.expand_path('~/chef-repo/cookbooks')]
-chef_server_url \"https://api.opscode.com/organizations/ccanalyticsapi-dunamis-org\"
-node_name \"cdotopscode\"
-client_key \"/etc/chef/cdotopscode.pem\"
-validation_client_name \"ccanalyticsapi-dunamis-org-validator\"
-validation_key \"/etc/chef/ccanalyticsapi-dunamis-org-validator.pem\"" >/root/.chef/knife.rb
+chef_server_url \"https://api.opscode.com/organizations/your-org\"
+node_name \"opscode\"
+client_key \"/etc/chef/opscode.pem\"
+validation_client_name \"your-org-validator\"
+validation_key \"/etc/chef/your-org-validator.pem\"" >/root/.chef/knife.rb
 echo "-----BEGIN RSA PRIVATE KEY-----
 <SAME CHEF DEV ORG VALIDATOR KEY as dunamis_cd>
------END RSA PRIVATE KEY-----" >/etc/chef/ccanalyticsapi-dunamis-org-validator.pem
+-----END RSA PRIVATE KEY-----" >/etc/chef/your-org-validator.pem
 noderole=tomcat
-environment=Dunamis_cd
-chefkeyloc=s3://378114605806-ide/dunamis/cd/chef_keys
-orgname=ccanalyticsapi-dunamis-org
+environment=dev
+chefkeyloc=s3://xxxxxx/chef_keys
+orgname=your-org
 iamrole=True
-userID=cdotopscode
+userID=opscode
 ```
 - Once the '/root/.chef' folder with knife.rb is created run ```/etc/init.d/chef_run start``` to test chef-client run
 - If everything is working as expected following command will display tomcat/java, datadog agent and splunk processes running on the instance:
@@ -1012,7 +989,7 @@ root       7510   7381  0 20:33 ?        00:00:02 /opt/splunk/bin/python -O /opt
 root       7571   7381  0 20:33 ?        00:00:01 /opt/splunk/bin/splunkd instrument-resource-usage -p 8089 --with-kvstore
 ```
 
-### Test the Dunamis APP running in the new AMI based instance
+### Test the APP running in the new AMI based instance
 
 - spin up an instance using the Amazon Linux LTS AMI, dunamis_cd key, in the same VPC and subnet as dunamis_cd instance, and with following user-data script (to run taurus encapsulated locustio script running 4000 clients):
 ```
@@ -1031,18 +1008,18 @@ def version(l):
     payload = {
       \"events\": [
   {
-          \"project\":\"dunamis-apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dunamis\",
+          \"project\":\"apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dunamis\",
           \"data\":{
               \"event.user_guid\":\"123456789012345678901234@AdobeID\",
               \"event.type\":\" click-test-locustbzt4000_2\",
               \"eventGUID\":\"123456789101GHJKIUHYJOLPFT67-1\",
               \"event.category\":\"DESKTOP\",
-              \"event.workflow\":\"Learn\",
-              \"event.subcategory\":\"Panel\",
+              \"event.workflow\":\"blahbalk\",
+              \"event.subcategory\":\"lion\",
               \"event.subtype\":\"tutorial\",
               \"ingestMetadata\": {
                          \"zBuildVersion\": \"7bdf5eb2ce3a8b7 - 201511051903\",
-                         \"zRequestID\": \"ef7b9fc7-ec1d-42d4-91d7-b0b6d9f1a022\",
+                         \"zRequestID\": \"ef7b9fc7-xx3d-xx4d-91d7-b0b6d9f1a022\",
                          \"zIP\" :\"10.1.1.1\"
                         }
           }
@@ -1072,7 +1049,7 @@ echo "execution:
     timeout: 5ms
     scenario: 
       script: locustfile.py
-      default-address: http://ingest-ue1.stage.dunamis.adobepabloproject.com
+      default-address: http://yourapiurl.com
 reporting:
   - module: blazemeter
     report-name: locustDun
@@ -1095,16 +1072,6 @@ nohup /root/start_test.sh &
 
 - IF everything is working as expected - instance from new AMI will send logs during load testing to splunk-us server under dunamis-stage-ue1 index. Search on splunk dashboard to get test results:
 ```
-index=dunamis-stage-ue1  AND click-test-locustbzt4000_2
+index=splunkindex  AND click-test-locustbzt4000_2
 ```
-- Results should look something like this 
-![NewAMI LocustIO test output in Splunk](https://git.corp.adobe.com/dunamis-devops/packer-amibulder/blob/master/locustio_new_ami_test.png)
-
-New AMI on m4.xlarge - We got around <b>12502.8</b> requests per minute for 1 instance.<br>
-New AMI on m4.4xlarge - We got around <b>20556.63</b> requests per minute for 1 instance.<br>
-New AMI on m5.xlarge - We got around <b>20111.89</b> requests per minute for 1 instance.<br>
-
-Old AMI on m3.large (older instance type with lower # of CPUs) - we got <b>20388.93</b> requests per minute for 1 instance.
-
-Old AMI on m4.xlarge - we got <b>18416.6</b> requests per minute for 1 instance.
 
