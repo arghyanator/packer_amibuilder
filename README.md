@@ -1,12 +1,12 @@
 
 # CCEIMG packer-amibulder
 ### Custom AMI Builder using packer 
-Create an EC2 t2.micro instance with IAM role assigned to orchestrate and build an EBS backed AMI based on CloudOPS AMIs
+Create an EC2 t2.micro instance with IAM role assigned to orchestrate and build an EBS backed AMI based on custom AMIs
 
-#### Steps to set up Packer Framework in Dunamis DEV US-EAST-1 account
+#### Steps to set up Packer Framework in DEV US-EAST-1 account
 
 ##### Step 1 - Create IAM Policy
-IAM policy - CCEIMG_packer_amibuilder_IAM_policy
+IAM policy - packer_amibuilder_IAM_policy
 
 ```
 {
