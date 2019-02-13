@@ -166,7 +166,7 @@ Available commands are:
 
 ```
 
-To Log in to the instance - first SSH in to the bastion_CD or dev bastion host and then from there use the 'dunamis_cd' ssh key to log in to Packer instance as 'ec2-user':
+To Log in to the instance - first SSH in to the bastion_CD or dev bastion host and then from there use the 'Dev' ssh key to log in to Packer instance as 'ec2-user':
 ```
 -bash-4.2$ ssh -i yourkey.pem ec2-user@10.x.x.x
 Last login: Fri Mar  2 23:39:27 2018 from ip-10-76-151-119.ec2.internal
@@ -717,7 +717,7 @@ from itsdangerous import (TimedJSONWebSignatureSerializer
 
 # initialization
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'dunamis packer templates'
+app.config['SECRET_KEY'] = 'dev packer templates'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 
@@ -929,7 +929,7 @@ Add Security Group and rule as shown below from ypur data center 'Egress IP' to 
 
 ##### Run Jenkins job specifying the source AMI ID
 
-###### Files used for AMI build on Dunamis_cd account S3
+###### Files used for AMI build on dev account S3
 
 Chef client:
 https://s3.amazonaws.com/packer-ami-build/packages/chef-13.8.0-1.el7.x86_64.rpm
@@ -941,10 +941,10 @@ https://s3.amazonaws.com/splunkupgrade/splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_6
 
 - Launch a new instance from the 
 - Use m4.xlarge instance size
-- Use the same VPC and subnet as the dunamis_cd instance
-- Use this same IAM role that is being used by the dunamis_cd 
-  (Currently - arn:aws:iam::378114605806:instance-profile/Dunamis-cd-20180205215129-ec2RoleInstanceProfile-1I2PK67V7S0DM)
-- Use the same Security Groups as the ones used for dunamis_cd instance
+- Use the same VPC and subnet as the dev instance
+- Use this same IAM role that is being used by the DEV 
+  (Currently - arn:aws:iam::xxxxxxx:instance-profile/dev-20180205215129-ec2RoleInstanceProfile-1I2PK67V7S0DM)
+- Use the same Security Groups as the ones used for DEV instance
 - Use this UserData script and variables:
 ```
 #!/bin/sh
@@ -961,7 +961,7 @@ client_key \"/etc/chef/opscode.pem\"
 validation_client_name \"your-org-validator\"
 validation_key \"/etc/chef/your-org-validator.pem\"" >/root/.chef/knife.rb
 echo "-----BEGIN RSA PRIVATE KEY-----
-<SAME CHEF DEV ORG VALIDATOR KEY as dunamis_cd>
+<SAME CHEF DEV ORG VALIDATOR KEY as DEV>
 -----END RSA PRIVATE KEY-----" >/etc/chef/your-org-validator.pem
 noderole=tomcat
 environment=dev
@@ -991,7 +991,7 @@ root       7571   7381  0 20:33 ?        00:00:01 /opt/splunk/bin/splunkd instru
 
 ### Test the APP running in the new AMI based instance
 
-- spin up an instance using the Amazon Linux LTS AMI, dunamis_cd key, in the same VPC and subnet as dunamis_cd instance, and with following user-data script (to run taurus encapsulated locustio script running 4000 clients):
+- spin up an instance using the Amazon Linux LTS AMI, DEV key, in the same VPC and subnet as DEV instance, and with following user-data script (to run taurus encapsulated locustio script running 4000 clients):
 ```
 #!/bin/bash
 yum install -y python-pip
@@ -1008,7 +1008,7 @@ def version(l):
     payload = {
       \"events\": [
   {
-          \"project\":\"apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dunamis\",
+          \"project\":\"apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dev\",
           \"data\":{
               \"event.user_guid\":\"123456789012345678901234@someID\",
               \"event.type\":\" click-test-locustbzt4000_2\",
@@ -1070,7 +1070,7 @@ nohup /root/start_test.sh &
 
 <b>Note:</b> Make sure to put the AMI based instance's local IP in the user-data script above to direct tests to hit the new AMI based instance
 
-- IF everything is working as expected - instance from new AMI will send logs during load testing to splunk-us server under dunamis-stage-ue1 index. Search on splunk dashboard to get test results:
+- IF everything is working as expected - instance from new AMI will send logs during load testing to splunk-us server under dev index. Search on splunk dashboard to get test results:
 ```
 index=splunkindex  AND click-test-locustbzt4000_2
 ```
