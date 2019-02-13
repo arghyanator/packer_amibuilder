@@ -362,11 +362,11 @@ Points to note in the JSON file:
 
 ```
 # Cookbook used by packer
-# to customize CloudOPS provided Adobe AMIs
+# to customize Custom provided  AMIs
 #
 ###############
 # Creates deploy user with right keys
-# Creates Adobe "Message of the day" Linux MOTD file
+# Creates "Message of the day" Linux MOTD file
 # Install splunk 6.6.5 forwarders
 # Removes 1G separate volume mount for /tmp
 # Adds cloudops ssh-key script
