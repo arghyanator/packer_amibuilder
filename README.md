@@ -1010,7 +1010,7 @@ def version(l):
   {
           \"project\":\"apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dunamis\",
           \"data\":{
-              \"event.user_guid\":\"123456789012345678901234@AdobeID\",
+              \"event.user_guid\":\"123456789012345678901234@someID\",
               \"event.type\":\" click-test-locustbzt4000_2\",
               \"eventGUID\":\"123456789101GHJKIUHYJOLPFT67-1\",
               \"event.category\":\"DESKTOP\",
