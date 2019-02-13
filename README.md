@@ -1,5 +1,5 @@
 
-# CCEIMG packer-amibulder
+# packer-amibulder
 ### Custom AMI Builder using packer 
 Create an EC2 t2.micro instance with IAM role assigned to orchestrate and build an EBS backed AMI based on custom AMIs
 
@@ -237,8 +237,8 @@ if [[ -z "$COOKBOOK_PATH" ]]; then
   COOKBOOK_PATH="${SCRIPT_FOLDER_RELATIVE}/cookbooks"
 fi
 DATE=$(date +"%Y-%m-%d_%H_%M_%S_UTC")
-TARGETAMI="CCEIMG_PACKER_AMI_V${DATE}"
-packer build -var "profile=$AWS_PROFILE" -var "SOURCEAMI=${1}" -var "TARGETAMI=${TARGETAMI}" ${SCRIPT_FOLDER_RELATIVE}/CCEIMG_ami_packer.json
+TARGETAMI="PACKER_AMI_V${DATE}"
+packer build -var "profile=$AWS_PROFILE" -var "SOURCEAMI=${1}" -var "TARGETAMI=${TARGETAMI}" ${SCRIPT_FOLDER_RELATIVE}/ami_packer.json
 
 echo -e '\033[1mIf Packer Succeded above then your new AMI Name is...\033'
 echo ${TARGETAMI}
@@ -627,7 +627,7 @@ The whole process takes less than 10 minutes (you may check intermediate status 
 [root@ip-10-76-151-146 ~]# ./call_packer.sh <source-ami-id>
 amazon-ebs output will be in this color.
 
-==> amazon-ebs: Prevalidating AMI Name: CCEIMG_AMI_V1.6
+==> amazon-ebs: Prevalidating AMI Name: AMI_V1.6
     amazon-ebs: Found Image ID: ami-e156b69c
 ==> amazon-ebs: Creating temporary keypair: packer_5a99e179-87f5-ded8-8084-058024720c43
 ==> amazon-ebs: Creating temporary security group for this instance: packer_5a99e17e-ecb1-e206-c775-2f424fddf960
@@ -656,13 +656,13 @@ amazon-ebs output will be in this color.
 ==> amazon-ebs: Stopping the source instance...
     amazon-ebs: Stopping instance, attempt 1
 ==> amazon-ebs: Waiting for the instance to stop...
-==> amazon-ebs: Creating the AMI: CCEIMG_AMI_V1.6
+==> amazon-ebs: Creating the AMI: AMI_V1.6
     amazon-ebs: AMI: ami-2469b759
 ==> amazon-ebs: Waiting for AMI to become ready...
 ==> amazon-ebs: Adding tags to AMI (ami-2469b759)...
 ==> amazon-ebs: Tagging snapshot: snap-02c2eb62ae28ab588
 ==> amazon-ebs: Creating AMI tags
-    amazon-ebs: Adding tag: "Name": "CCEIMG_AMI_V1.6"
+    amazon-ebs: Adding tag: "Name": "AMI_V1.6"
 ==> amazon-ebs: Creating snapshot tags
 ==> amazon-ebs: Terminating the source AWS instance...
 ==> amazon-ebs: Cleaning up any extra volumes...
