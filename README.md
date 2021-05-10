@@ -249,8 +249,16 @@ echo -e '\033[1m\033[0m'
 
 ```
 {
+  "_comment1": "Packer Config JSON",
+  "_comment2": "Last Update Date =  2021",
+  "_comment3": "Last Change = Added Version fix in install_command for chef-client provisioners",
+  "_comment4": "Author = Arghya Banerjee",
+  "_comment5": "Uses 'Shell' and 'chef-client' provisioners to customize AMI",
+  "_comment6": "set 'knife_command' as /bin/true to trick Chef Zero server or chef-local into thinking that chef-client is always successful",
+  "_comment7": "Reference = https://www.packer.io/docs/provisioners/chef-client.html",
   "variables": {
     "profile":  "{{env `AWS_PROFILE`}}",
+    "packer_profile": "packer_amibuilder_IAM_Role",
     "script_folder_relative": "{{env `SCRIPT_FOLDER_RELATIVE`}}",
     "SOURCEAMI": "{{env `SOURCEAMI`}}",
     "TARGETAMI": "{{env `TARGETAMI`}}",
@@ -260,10 +268,13 @@ echo -e '\033[1m\033[0m'
     "type": "amazon-ebs",
     "profile": "{{user `profile`}}",
     "region": "us-east-1",
-    "subnet_id": "subnet-xxxxxx",
+    "subnet_id": "<subnet-id>",
     "source_ami": "{{user `SOURCEAMI`}}",
-    "instance_type": "t2.micro",
+    "instance_type": "t2.small",
     "ssh_username": "ec2-user",
+    "security_group_ids": [ "<pre-created-secure-SG-ID>" ],
+    "ami_users": ["<AWSACCOUNT1>", "<AWSACCOUNT2>"],
+    "iam_instance_profile": "{{user `packer_profile`}}",
     "ami_name": "{{user `TARGETAMI`}}",
     "tags" : { "Name" : "{{user `TARGETAMI`}}" },
     "launch_block_device_mappings": [
@@ -283,6 +294,10 @@ echo -e '\033[1m\033[0m'
       {
         "device_name": "/dev/xvdk",
         "no_device": true
+      },
+      {
+        "device_name": "/dev/xvdcz",
+        "no_device": true
       }
     ]
   }],
@@ -290,15 +305,19 @@ echo -e '\033[1m\033[0m'
     {
       "type": "shell",
       "inline": [
-  "sudo mkdir -p /packer-chef-client/cookbooks",
+      "sudo mkdir -p /packer-chef-client/cookbooks",
         "sudo chown -R ec2-user /packer-chef-client" 
       ],
       "remote_folder": "/home/ec2-user"
     },
-
+    {
+      "type": "shell",
+      "inline": ["sudo /bin/rpm -e `rpm -qa |grep chef`"],
+      "remote_folder": "/home/ec2-user"
+    },
     { 
       "type": "shell",
-      "inline": ["wget -O /packer-chef-client/chef-13.8.0-1.el7.x86_64.rpm https://s3.amazonaws.com/packer-ami-build/packages/chef-13.8.0-1.el7.x86_64.rpm"],
+      "inline": ["aws s3 cp s3://<bucketname>/packages/chef-13.8.0-1.el7.x86_64.rpm  /packer-chef-client/chef-13.8.0-1.el7.x86_64.rpm"],
       "remote_folder": "/home/ec2-user"
     },
     {
@@ -320,6 +339,7 @@ echo -e '\033[1m\033[0m'
     {
       "type": "chef-client",
       "server_url": "http://localhost:8889",
+      "install_command": "sudo /bin/rpm -e `rpm -qa |grep chef`; curl -L https://omnitruck.chef.io/chef/install.sh | {{if .Sudo}}sudo{{end}} bash -s -- -v 13.8.0",
       "config_template": "{{ user `script_folder_relative` }}/client.rb.tpl",
       "run_list": [
         "recipe[customizami]"
@@ -362,61 +382,28 @@ Points to note in the JSON file:
 
 ```
 # Cookbook used by packer
-# to customize Custom provided  AMIs
+# to customize AMIs
 #
 ###############
-# Creates deploy user with right keys
-# Creates "Message of the day" Linux MOTD file
-# Install splunk 6.6.5 forwarders
-# Removes 1G separate volume mount for /tmp
-# Adds cloudops ssh-key script
-# Adds chef_run script to bootstrap chef-client @ startup
-# Adds chef_remove script to remove itself from chef server on shutdown
-# Downgrades chef-client to 11.8
-# Upgrades datadog agent
-# Installs Nginx
-# Cleans up ipv6 entries from sysctl.conf
+# Install software
+# Customize AMI
 ###############
 
-## Create Linux user deploy
-group 'deploy' do
-  action :create
-end
-
-user "deploy" do
-  manage_home true
-  home "/home/deploy"
-  shell "/bin/bash"
-  group "deploy"
-  notifies :run, "execute[set_ssh_key_deploy]", :immediately
-  not_if "getent passwd deploy"
-end
-
-execute "set_ssh_key_deploy" do
-  command "mkdir -p /home/deploy/.ssh && chown deploy:deploy /home/deploy/.ssh && chmod 744 /home/deploy/.ssh && echo 'deploy ALL=(ALL) NOPASSWD:ALL' >>/etc/sudoers"
-  action :nothing
-end
-
-## Create SSH key - DEV - Just a placeholder - file gets overwritten based on Region and project instance is launched in
-file '/home/deploy/.ssh/authorized_keys' do
-  owner 'deploy'
-  group 'deploy'
-  mode '0644'
-  content 'ssh-rsa xxxxxxxyourekeyxxxxxx yourusername
-'
-  action :create
-end
 
 ## Create MOTD banner
+## Get current date
+_time =  Time.new.strftime("%Y%m%d") 
 file '/etc/update-motd.d/30-banner' do
   owner 'root'
   group 'root'
   mode '0755'
-  content '
+  content "
 #!/bin/bash
-####
- 
-echo "Version 20180302"'
+echo \"\" 
+echo \"================\"
+echo \"Version #{_time}\"
+echo \"================\"
+"
   action :create
   notifies :run, "execute[update_motd]", :immediately
 end
@@ -426,49 +413,31 @@ execute "update_motd" do
   action :nothing
 end
 
-## Install splunk
-##Create the splunk_upgrade directory
-%w{splunk_upgrade}.each do |dir|
-    directory "/#{dir}" do
-        mode '0755'
+##Create the AWS CLI Credentials directory
+%w{.aws}.each do |dir|
+    directory "/root/#{dir}" do
+        mode '0600'
         owner 'root'
         group 'root'
         action :create
         recursive true
     end
 end
-remote_file '/splunk_upgrade/splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm' do
-        source 'https://s3.amazonaws.com/splunkupgrade/splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm'
-        owner 'root'
-        group 'root'
-        mode '0644'
-        action :create
-        ignore_failure true
-        notifies :install, "rpm_package[splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm]", :immediately
-        retries 3
+
+# Create AWS CLI Credentials file
+file '/root/.aws/config' do
+  owner 'root'
+  group 'root'
+  mode '0644'
+  content '
+[profile packer]
+role_arn=arn:aws:iam::<AWSACCOUNT>:role/packer_amibuilder_IAM_Role
+credential_source=Ec2InstanceMetadata'
+  action :create
 end
 
-rpm_package 'splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm' do
-  source '/splunk_upgrade/splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm'
-  action :nothing
-  notifies :run, "execute[splunk_licenses]", :immediately  
-end
-
-execute "splunk_licenses" do
-  command "/opt/splunk/bin/splunk start --accept-license && /opt/splunk/bin/splunk enable boot-start"
-  action :nothing
-end
-
-##Delete the splunk upgrade folder and RPM file
-%w{splunk_upgrade}.each do |dir|
-    directory "/#{dir}" do
-        mode '0755'
-        owner 'root'
-        group 'root'
-        action :delete 
-        recursive true
-    end     
-end
+## Install aws-cli utilities
+package 'aws-cli' 
 
 ## Get rid of second 1G tmp volume and use root device based  /tmp folder instead
 ruby_block "remove_tmp_mount" do
@@ -481,82 +450,24 @@ ruby_block "remove_tmp_mount" do
   action :create
 end
 
-## Copy the /etc/init.d files - ec2-get-credentials, chef_run and chef_terminate
-
-## ec2-get-credentials adds public SSH keys to deploy user
-cookbook_file '/etc/init.d/ec2-get-credentials' do
-  source 'ec2-get-credentials'
-  owner 'root'
-  group 'root'
-  mode '0755'
-  action :create
-  notifies :run, "execute[enable_ec2-get-credentials]", :immediately 
-end
-
-execute "enable_ec2-get-credentials" do
-  command "/sbin/chkconfig --add ec2-get-credentials && /sbin/chkconfig --level 2345 ec2-get-credentials on"
-  action :nothing
-end
-
-## chef_run - bootstraps node to chef-server and runs chef-client in instance for first time ater boot up
-cookbook_file '/etc/init.d/chef_run' do
-  source 'chef_run'
-  owner 'root'
-  group 'root'
-  mode '0755'
-  action :create
-  notifies :run, "execute[enable_chef_run]", :immediately
-end
-
-execute "enable_chef_run" do
-  command "/sbin/chkconfig --add chef_run && /sbin/chkconfig --level 2345 chef_run on"
-  action :nothing
-end
-
-## chef_terminate - removes node from Chef server, and removes credentials from node for chef-server before shutting down
-cookbook_file '/etc/init.d/chef_terminate' do
-  source 'chef_terminate'
-  owner 'root'
-  group 'root'
-  mode '0755'
-  action :create_if_missing
-  notifies :run, "execute[enable_chef_terminate]", :immediately
-end
-execute "enable_chef_terminate" do
-  command "/sbin/chkconfig --add chef_terminate && /sbin/chkconfig --level 06 chef_terminate on"
-  action :nothing
-end
-
-## Install s3cmd utilities
+## Download and Install utilities
 package 'python-dateutil' 
 
-remote_file '/home/ec2-user/s3cmd-1.5.0.tar.gz' do
-        source 'https://s3.amazonaws.com/packer-ami-build/packages/s3cmd-1.5.0.tar.gz'
-        owner 'root'
-        group 'root'
-        mode '0644'
-        action :create
-        ignore_failure true
-        notifies :run, "execute[install_s3cmd]", :immediately
-        retries 3
-end
-
-execute "install_s3cmd" do
-  command "/bin/gunzip /home/ec2-user/s3cmd-1.5.0.tar.gz && cd /home/ec2-user; /bin/tar xvf /home/ec2-user/s3cmd-1.5.0.tar && mv /home/ec2-user/s3cmd-1.5.0 /usr/local"
-  action :nothing
-end
 
 ## Install Nginx
 package 'nginx'
 
-## Download Chef-client 11.8.2 which will be installed by Packer after chef-client run ends
-remote_file '/home/ec2-user/chef-11.8.2-1.el6.x86_64.rpm' do
-        source 'https://s3.amazonaws.com/packer-ami-build/packages/chef-11.8.2-1.el6.x86_64.rpm'
-        owner 'root'
-        group 'root'
-        mode '0644'
-        action :create
-        retries 3
+# Install Python Dependencies to run Cloudwatch memory python script
+bash "install python Dependencies for cloudwatch memory metric script" do
+  code <<-EOH
+    yum install -y gcc
+    yum install -y python27-pip
+    yum install -y python27-devel livevent-devel libevent-devel
+    pip install boto psutil --user
+    yum install -y python38*
+    python3 -m pip install boto psutil
+  EOH
+  ignore_failure true
 end
 
 ## Clean-up systctl-conf and tune up networking
@@ -579,6 +490,18 @@ ruby_block "clean_up_sysctl_ipv6_entries" do
     action :run
 end
 
+## Increase SSHD timeout values from what Adobe ImageFactory provides
+ruby_block "increase_sshd_timeouts" do
+    block do
+        fesshdc = Chef::Util::FileEdit.new("/etc/ssh/sshd_config")
+        fesshdc.search_file_delete_line(/^ClientAliveInterval.*$/)
+        fesshdc.insert_line_if_no_match(/ClientAliveInterval 86400/,
+          "ClientAliveInterval 86400")       
+        fesshdc.write_file
+    end
+    action :run
+end
+
 ## Add limits.conf tuning for nfile
 cookbook_file '/etc/security/limits.conf' do
   source 'limits.conf'
@@ -588,36 +511,67 @@ cookbook_file '/etc/security/limits.conf' do
   action :create
 end
 
-## Install datadog agent datadog-agent-5.x
-cookbook_file '/etc/yum.repos.d/datadog.repo' do
-  source 'datadog.repo'
+## Install NodeJS from nodesource to get latest node v10.x
+execute "Set NodeJS repo to nodesource rpms" do
+        command 'curl -sL https://rpm.nodesource.com/setup_14.x | bash -'
+        ignore_failure true
+        notifies :run, "execute[install_development_tools]", :immediately
+        retries 3
+end
+execute "install_development_tools" do
+        command 'yum groupinstall -y "Development Tools"'
+        ignore_failure true
+        action :nothing
+        notifies :run, "execute[install_node_and_npm]", :immediately
+        retries 3
+end
+execute "install_node_and_npm" do
+        command 'yum clean all; yum -y install nodejs nodejs-devel nodejs-docs --enablerepo=nodesource'
+        ignore_failure true
+        action :nothing
+        retries 3
+end
+
+
+# Add an empty crontab template with explanation of Linux Cron
+file '/root/crontabfile' do
   owner 'root'
   group 'root'
   mode '0644'
-  action :create_if_missing
-  notifies :run, "execute[update_datadog_agent]", :immediately
+  content "# For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+"
+  action :create
+  notifies :run, "execute[update_root_crontab]", :immediately
 end
-execute "update_datadog_agent" do
-  command "yum -y install datadog-agent"
+execute "update_root_crontab" do
+  command "crontab /root/crontabfile"
   action :nothing
+  notifies :run, "execute[delete_crontabfile]", :immediately
   ignore_failure true
+end
+execute "delete_crontabfile" do
+        command 'rm -rf /root/crontabfile'
+        action :nothing
+        ignore_failure true
+        retries 3
 end
 
-## Install Java 8 u51 
-remote_file '/home/ec2-user/jdk-8u51-linux-x64.tar.gz' do
-        source 'https://s3.amazonaws.com/packer-ami-build/packages/jdk-8u51-linux-x64.tar.gz'
-        owner 'root'
-        group 'root'
-        mode '0644'
-        action :create
+## Finally clean all yum cache
+execute "clean_yum_cache" do
+        command 'yum clean all'
+        ignore_failure true
         retries 3
-        notifies :run, "execute[install_java8u51]", :immediately
 end
-execute "install_java8u51" do
-  command "mkdir /usr/java; tar xvf /home/ec2-user/jdk-8u51-linux-x64.tar.gz -C /usr/java"
-  action :nothing
-  ignore_failure true
-end
+
 
 ```
 
@@ -628,7 +582,7 @@ The whole process takes less than 10 minutes (you may check intermediate status 
 amazon-ebs output will be in this color.
 
 ==> amazon-ebs: Prevalidating AMI Name: AMI_V1.6
-    amazon-ebs: Found Image ID: ami-e156b69c
+    amazon-ebs: Found Image ID: 
 ==> amazon-ebs: Creating temporary keypair: packer_5a99e179-87f5-ded8-8084-058024720c43
 ==> amazon-ebs: Creating temporary security group for this instance: packer_5a99e17e-ecb1-e206-c775-2f424fddf960
 ==> amazon-ebs: Authorizing access to port 22 from 0.0.0.0/0 in the temporary security group...
@@ -867,9 +821,9 @@ upstream packer {
 server {
   listen 80 default;
   listen [::]:80 default;
-  server_name 54.174.80.89;
-  return 301 https://54.174.80.89$request_uri;
-  rewrite ^ https://54.174.80.89$request_uri? permanent;
+  server_name <PublicIP>;
+  return 301 https://PublicIP$request_uri;
+  rewrite ^ https://PublicIP$request_uri? permanent;
 }
  
 server {
@@ -921,7 +875,7 @@ curl -i "http://localhost:5000/runpacker?sourceami=ami-465fe039"
 ```
 
 ##### Add AWS Security Group and rule to allow access to Packer Instance
-Add Security Group and rule as shown below from ypur data center 'Egress IP' to allow our Jenkins instance running in datacenter to access the packer Flask APIs over HTTPS.
+Add Security Group and rule as shown below from your data center 'Egress IP' to allow our Jenkins instance running in datacenter to access the packer Flask APIs over HTTPS.
 
 **Don't forget to add the new Security Group to the Packer instance created earlier**
 
@@ -931,11 +885,6 @@ Add Security Group and rule as shown below from ypur data center 'Egress IP' to 
 
 ###### Files used for AMI build on dev account S3
 
-Chef client:
-https://s3.amazonaws.com/packer-ami-build/packages/chef-13.8.0-1.el7.x86_64.rpm
-
-Splunk Forwarder:
-https://s3.amazonaws.com/splunkupgrade/splunk-6.6.5-b119a2a8b0ad-linux-2.6-x86_64.rpm
 
 ### Test the new AMI 
 
@@ -971,9 +920,9 @@ iamrole=True
 userID=opscode
 ```
 - Once the '/root/.chef' folder with knife.rb is created run ```/etc/init.d/chef_run start``` to test chef-client run
-- If everything is working as expected following command will display tomcat/java, datadog agent and splunk processes running on the instance:
+- If everything is working as expected following command will display tomcat/java, datadog agent running on the instance:
 ```
-# ps -eaf |egrep "java|dd-agent|splunk" |grep -v grep
+# ps -eaf |egrep "java|dd-agent" |grep -v grep
 root       5254      1 24 20:29 ?        00:09:18 /usr/java/jdk1.8.0_51/bin/java -Djava.util.logging.config.file=/usr/local/apache-tomcat-7.0.53/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Xms1024m -Xmx8g -Xss256K -XX:+DisableExplicitGC -XX:+UseConcMarkSweepGC -XX:ParallelCMSThreads=2 -XX:+CMSClassUnloadingEnabled -XX:+UseCMSCompactAtFullCollection -XX:CMSInitiatingOccupancyFraction=80 -javaagent:/etc/newrelic/newrelic.jar -Dcom.sun.management.jmxremote.port=8050 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.endorsed.dirs=/usr/local/apache-tomcat-7.0.53/endorsed -classpath /usr/local/apache-tomcat-7.0.53/bin/bootstrap.jar:/usr/local/apache-tomcat-7.0.53/bin/tomcat-juli.jar -Dcatalina.base=/usr/local/apache-tomcat-7.0.53 -Dcatalina.home=/usr/local/apache-tomcat-7.0.53 -Djava.io.tmpdir=/usr/local/apache-tomcat-7.0.53/temp org.apache.catalina.startup.Bootstrap start
 dd-agent   6581      1  0 20:31 ?        00:00:00 /opt/datadog-agent/embedded/bin/python /opt/datadog-agent/bin/supervisord -c /etc/dd-agent/supervisor.conf
 dd-agent   6586   6581  0 20:31 ?        00:00:01 /opt/datadog-agent/bin/trace-agent
@@ -982,11 +931,6 @@ dd-agent   6588   6581  1 20:31 ?        00:00:35 /opt/datadog-agent/embedded/bi
 dd-agent   6589   6581  0 20:31 ?        00:00:00 /opt/datadog-agent/embedded/bin/python /opt/datadog-agent/agent/jmxfetch.py
 dd-agent   6594   6581  0 20:31 ?        00:00:04 /opt/datadog-agent/embedded/bin/python /opt/datadog-agent/agent/agent.py foreground --use-local-forwarder
 dd-agent   6635   6589  0 20:31 ?        00:00:16 /usr/java/jdk1.8.0_51/bin/java -Xms50m -Xmx200m -classpath /opt/datadog-agent/agent/checks/libs/jmxfetch-0.18.1-jar-with-dependencies.jar org.datadog.jmxfetch.App --check tomcat.yaml --check_period 15000 --conf_directory /etc/dd-agent/conf.d --log_level INFO --log_location /var/log/datadog/jmxfetch.log --reporter statsd:localhost:8125 --status_location /opt/datadog-agent/run/jmx_status.yaml collect
-root       7377      1  1 20:33 ?        00:00:32 splunkd -p 8089 restart
-root       7381   7377  0 20:33 ?        00:00:00 [splunkd pid=7377] splunkd -p 8089 restart [process-runner]
-root       7395   7381  0 20:33 ?        00:00:04 mongod --dbpath=/opt/splunk/var/lib/splunk/kvstore/mongo --port=8191 --timeStampFormat=iso8601-utc --smallfiles --oplogSize=200 --keyFile=/opt/splunk/var/lib/splunk/kvstore/mongo/splunk.key --setParameter=enableLocalhostAuthBypass=0 --replSet=D2F93040-62A5-43B6-BECC-BA299A159ABF --sslMode=requireSSL --sslAllowInvalidHostnames --sslPEMKeyFile=/opt/splunk/etc/auth/server.pem --sslPEMKeyPassword=xxxxxxxx --sslCipherConfig=TLSv1+HIGH:TLSv1.2+HIGH:@STRENGTH --nounixsocket --noscripting
-root       7510   7381  0 20:33 ?        00:00:02 /opt/splunk/bin/python -O /opt/splunk/lib/python2.7/site-packages/splunk/appserver/mrsparkle/root.py --proxied=127.0.0.1,8065,8000
-root       7571   7381  0 20:33 ?        00:00:01 /opt/splunk/bin/splunkd instrument-resource-usage -p 8089 --with-kvstore
 ```
 
 ### Test the APP running in the new AMI based instance
@@ -1008,26 +952,13 @@ def version(l):
     payload = {
       \"events\": [
   {
-          \"project\":\"apitest-stats\", \"environment\":\"cd-ue1\", \"time\":TIME.rstrip(), \"ingesttype\":\"dev\",
-          \"data\":{
-              \"event.user_guid\":\"123456789012345678901234@someID\",
-              \"event.type\":\" click-test-locustbzt4000_2\",
-              \"eventGUID\":\"123456789101GHJKIUHYJOLPFT67-1\",
-              \"event.category\":\"DESKTOP\",
-              \"event.workflow\":\"blahbalk\",
-              \"event.subcategory\":\"lion\",
-              \"event.subtype\":\"tutorial\",
-              \"ingestMetadata\": {
-                         \"zBuildVersion\": \"7bdf5eb2ce3a8b7 - 201511051903\",
-                         \"zRequestID\": \"ef7b9fc7-xx3d-xx4d-91d7-b0b6d9f1a022\",
-                         \"zIP\" :\"10.1.1.1\"
-                        }
+         
           }
         }
       ]
     }
     headers = {'content-type': 'application/json'}
-    l.client.post(\"/ingest\", data=json.dumps(payload), headers=headers)
+    l.client.post(\"/someURL\", data=json.dumps(payload), headers=headers)
 
 class UserBehavior(TaskSet):
     tasks = {version: 1}
