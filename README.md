@@ -3,7 +3,7 @@
 ### Custom AMI Builder using packer 
 Create an EC2 t2.micro instance with IAM role assigned to orchestrate and build an EBS backed AMI based on custom AMIs
 
-#### Steps to set up Packer Framework in DEV US-EAST-1 account
+#### Steps to set up Packer Framework in AWS account
 
 ##### Step 1 - Create IAM Policy
 IAM policy - packer_amibuilder_IAM_policy
