@@ -983,9 +983,9 @@ echo "execution:
       default-address: http://yourapiurl.com
 reporting:
   - module: blazemeter
-    report-name: locustDun
-    test: locustDun
-    project: locustDun" >/root/locust.yml
+    report-name: locustprod
+    test: locustprod
+    project: locustProd" >/root/locust.yml
 echo "cd /root
 /usr/bin/bzt locust.yml &
 /usr/bin/bzt locust.yml &
