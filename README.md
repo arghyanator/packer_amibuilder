@@ -1,6 +1,6 @@
 
 # packer-amibulder
-### Custom AMI Builder using packer 
+### Custom AMI Builder using packer and Chef Solo or Chef Local or Chef Zero
 Create an EC2 t2.micro instance with IAM role assigned to orchestrate and build an EBS backed AMI based on custom AMIs
 
 #### Steps to set up Packer Framework in AWS account
